@@ -184,7 +184,11 @@ object QueryCompilationErrors {
   }
 
   def windowSpecificationNotDefinedError(windowName: String): Throwable = {
-    new AnalysisException(s"Window specification $windowName is not defined in the WINDOW clause.")
+    new AnalysisException(
+      errorClass = "REFERENCE_NOT_DEFINED",
+      messageParameters = Array(s"Window specification $windowName" +
+        " is not defined in the WINDOW clause.")
+    )
   }
 
   def selectExprNotInGroupByError(expr: Expression, groupByAliases: Seq[Alias]): Throwable = {
@@ -347,41 +351,67 @@ object QueryCompilationErrors {
   }
 
   def windowAggregateFunctionWithFilterNotSupportedError(): Throwable = {
-    new AnalysisException("window aggregate function with filter predicate is not supported yet.")
+    new AnalysisException(
+      errorClass = "UNSUPPORTED_FEATURE",
+      messageParameters = Array("window aggregate function with filter" +
+        " predicate is not supported yet.")
+    )
   }
 
   def windowFunctionInsideAggregateFunctionNotAllowedError(): Throwable = {
-    new AnalysisException("It is not allowed to use a window function inside an aggregate " +
-      "function. Please use the inner window function in a sub-query.")
+    new AnalysisException(
+      errorClass = "UNSUPPORTED_FEATURE",
+      messageParameters = Array("It is not allowed to use a window function inside an aggregate " +
+        "function. Please use the inner window function in a sub-query.")
+    )
   }
 
   def expressionWithoutWindowExpressionError(expr: NamedExpression): Throwable = {
-    new AnalysisException(s"$expr does not have any WindowExpression.")
+    new AnalysisException(
+      errorClass = "WINDOW_ERROR",
+      messageParameters = Array(s"$expr does not have any WindowExpression.")
+    )
   }
 
   def expressionWithMultiWindowExpressionsError(
       expr: NamedExpression, distinctWindowSpec: Seq[WindowSpecDefinition]): Throwable = {
-    new AnalysisException(s"$expr has multiple Window Specifications ($distinctWindowSpec)." +
+    new AnalysisException(
+      errorClass = "WINDOW_ERROR",
+      messageParameters = Array(s"$expr has multiple Window Specifications ($distinctWindowSpec)." +
       "Please file a bug report with this error message, stack trace, and the query.")
+    )
   }
 
   def windowFunctionNotAllowedError(clauseName: String): Throwable = {
-    new AnalysisException(s"It is not allowed to use window functions inside $clauseName clause")
+    new AnalysisException(
+      errorClass = "UNSUPPORTED_FEATURE",
+      messageParameters = Array(s"It is not allowed to use" +
+        s" window functions inside $clauseName clause.")
+    )
   }
 
   def cannotSpecifyWindowFrameError(prettyName: String): Throwable = {
-    new AnalysisException(s"Cannot specify window frame for $prettyName function")
+    new AnalysisException(
+      errorClass = "WINDOW_ERROR",
+      messageParameters = Array(s"Cannot specify window frame for $prettyName function.")
+    )
   }
 
   def windowFrameNotMatchRequiredFrameError(
       f: SpecifiedWindowFrame, required: WindowFrame): Throwable = {
-    new AnalysisException(s"Window Frame $f must match the required frame $required")
+    new AnalysisException(
+      errorClass = "WINDOW_ERROR",
+      messageParameters = Array(s"Window Frame $f must match the required frame $required.")
+    )
   }
 
   def windowFunctionWithWindowFrameNotOrderedError(wf: WindowFunction): Throwable = {
-    new AnalysisException(s"Window function $wf requires window to be ordered, please add " +
+    new AnalysisException(
+      errorClass = "WINDOW_ERROR",
+      messageParameters = Array(s"Window function $wf requires window to be ordered, please add " +
       s"ORDER BY clause. For example SELECT $wf(value_expr) OVER (PARTITION BY window_partition " +
       "ORDER BY window_ordering) from table")
+    )
   }
 
   def cannotResolveUserSpecifiedColumnsError(col: String, t: TreeNode[_]): Throwable = {
@@ -395,14 +425,20 @@ object QueryCompilationErrors {
   }
 
   def multiTimeWindowExpressionsNotSupportedError(t: TreeNode[_]): Throwable = {
-    new AnalysisException("Multiple time/session window expressions would result in a cartesian " +
-      "product of rows, therefore they are currently not supported.", t.origin.line,
-      t.origin.startPosition)
+    new AnalysisException(
+      errorClass = "UNSUPPORTED_FEATURE",
+      messageParameters = Array("Multiple time/session window expressions would result " +
+        "in a cartesian product of rows, therefore they are currently not supported."),
+      t.origin
+    )
   }
 
   def sessionWindowGapDurationDataTypeError(dt: DataType): Throwable = {
-    new AnalysisException("Gap duration expression used in session window must be " +
+    new AnalysisException(
+      errorClass = "WINDOW_ERROR",
+      messageParameters = Array("Gap duration expression used in session window must be " +
       s"CalendarIntervalType, but got ${dt}")
+    )
   }
 
   def viewOutputNumberMismatchQueryColumnNamesError(
@@ -1536,8 +1572,11 @@ object QueryCompilationErrors {
   }
 
   def invalidLiteralForWindowDurationError(): Throwable = {
-    new AnalysisException("The duration and time inputs to window must be " +
+    new AnalysisException(
+      errorClass = "WINDOW_ERROR",
+      messageParameters = Array("The duration and time inputs to window must be " +
       "an integer, long or string literal.")
+    )
   }
 
   def noSuchStructFieldInGivenFieldsError(
@@ -1583,12 +1622,17 @@ object QueryCompilationErrors {
   }
 
   def emptyWindowExpressionError(expr: Window): Throwable = {
-    new AnalysisException(s"Window expression is empty in $expr")
+    new AnalysisException(
+      errorClass = "WINDOW_ERROR",
+      messageParameters = Array(s"Window expression is empty in $expr")
+    )
   }
 
   def foundDifferentWindowFunctionTypeError(windowExpressions: Seq[NamedExpression]): Throwable = {
     new AnalysisException(
-      s"Found different window function type in $windowExpressions")
+      errorClass = "WINDOW_ERROR",
+      messageParameters = Array(s"Found different window function type in $windowExpressions")
+    )
   }
 
   def charOrVarcharTypeAsStringUnsupportedError(): Throwable = {

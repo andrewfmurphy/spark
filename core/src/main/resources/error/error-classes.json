@@ -154,6 +154,10 @@
     "message" : [ "Failed to rename as %s was not found" ],
     "sqlState" : "22023"
   },
+  "REFERENCE_NOT_DEFINED" : {
+    "message" : [ "Reference not defined: %s" ],
+    "sqlState" : "42601"
+  },
   "SECOND_FUNCTION_ARGUMENT_NOT_INTEGER" : {
     "message" : [ "The second argument of '%s' function needs to be an integer." ],
     "sqlState" : "22023"
@@ -178,6 +182,10 @@
   },
   "UNSUPPORTED_OPERATION" : {
     "message" : [ "The operation is not supported: %s" ]
+  },
+  "WINDOW_ERROR" : {
+    "message": [ "Window Error: %s"],
+    "sqlState" : "42P20"
   },
   "WRITING_JOB_ABORTED" : {
     "message" : [ "Writing job aborted" ],

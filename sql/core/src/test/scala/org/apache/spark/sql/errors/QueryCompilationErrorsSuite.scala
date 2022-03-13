@@ -17,8 +17,10 @@
 
 package org.apache.spark.sql.errors
 
+import org.scalatest.matchers.should.Matchers._
+
 import org.apache.spark.sql.{AnalysisException, IntegratedUDFTestUtils, QueryTest}
-import org.apache.spark.sql.functions.{grouping, grouping_id, sum}
+import org.apache.spark.sql.functions.{grouping, grouping_id, session_window, sum, to_timestamp}
 import org.apache.spark.sql.test.SharedSparkSession
 
 case class StringLongClass(a: String, b: Long)
@@ -167,5 +169,182 @@ class QueryCompilationErrorsSuite extends QueryTest with SharedSparkSession {
     assert(e.message ===
       "The feature is not supported: " +
       "Pandas UDF aggregate expressions don't support pivot.")
+  }
+
+  test("REFERENCE_NOT_DEFINED: window specification is not defined in the window clause.") {
+    withTempView("df") {
+      val df = Seq(
+        (536361, "85123A", 2, 17850),
+        (536362, "85123B", 4, 17850),
+        (536363, "86123A", 6, 17851)
+      ).toDF("InvoiceNo", "StockCode", "Quantity", "CustomerID")
+      df.createTempView("df")
+
+      val e = intercept[AnalysisException] {
+        sql("SELECT ROW_NUMBER() OVER win1 FROM df WINDOW win2 AS (PARTITION BY CustomerID)")
+      }
+      assert(e.errorClass === Some("REFERENCE_NOT_DEFINED"))
+      assert(e.message ===
+        "Reference not defined: Window specification win1 is not defined in the WINDOW clause.")
+    }
+  }
+
+  test("UNSUPPORTED_FEATURE: window aggregate function with filter predicate.") {
+    withTempView("df") {
+      val df = Seq(
+        (536361, "85123A", 2, 17850),
+        (536362, "85123B", 4, 17850),
+        (536363, "86123A", 6, 17851)
+      ).toDF("InvoiceNo", "StockCode", "Quantity", "CustomerID")
+      df.createTempView("df")
+
+      val e = intercept[AnalysisException] {
+        sql("SELECT SUM(Quantity) FILTER(WHERE Quantity > 5) " +
+          "OVER (PARTITION BY CustomerID) FROM df")
+      }
+      assert(e.errorClass === Some("UNSUPPORTED_FEATURE"))
+      assert(e.message ===
+        "The feature is not supported: window aggregate function" +
+          " with filter predicate is not supported yet.")
+    }
+  }
+
+  test("UNSUPPORTED_FEATURE: window function inside aggregate function.") {
+    withTempView("df") {
+      val df = Seq(
+        (536361, "85123A", 2, 17850),
+        (536362, "85123B", 4, 17850),
+        (536363, "86123A", 6, 17851)
+      ).toDF("InvoiceNo", "StockCode", "Quantity", "CustomerID")
+      df.createTempView("df")
+
+      val e = intercept[AnalysisException] {
+        sql("SELECT SUM(SUM(Quantity) OVER (PARTITION BY CustomerID)) FROM df")
+      }
+      assert(e.errorClass === Some("UNSUPPORTED_FEATURE"))
+      assert(e.message ===
+        "The feature is not supported: It is not allowed to use a window function" +
+          " inside an aggregate function. Please use the inner window function in a sub-query.")
+    }
+  }
+
+  test("UNSUPPORTED_FEATURE: window function not allowed.") {
+    withTempView("df") {
+      val df = Seq(
+        (536361, "85123A", 2, 17850),
+        (536362, "85123B", 4, 17850),
+        (536363, "86123A", 6, 17851)
+      ).toDF("InvoiceNo", "StockCode", "Quantity", "CustomerID")
+      df.createTempView("df")
+
+      val e = intercept[AnalysisException] {
+        sql("SELECT CustomerID FROM df WHERE Sum(Quantity) " +
+          "OVER win1 > 5 WINDOW win1 as (PARTITION BY StockCode)")
+      }
+      assert(e.errorClass === Some("UNSUPPORTED_FEATURE"))
+      assert(e.message ===
+        "The feature is not supported: It is not allowed" +
+          " to use window functions inside WHERE clause.")
+    }
+  }
+
+  test("WINDOW_ERROR: cannot specify window frame.") {
+    withTempView("df") {
+      val df = Seq(
+        (536361, "85123A", 2, 17850),
+        (536362, "85123B", 4, 17850),
+        (536363, "86123A", 6, 17851)
+      ).toDF("InvoiceNo", "StockCode", "Quantity", "CustomerID")
+      df.createTempView("df")
+
+      val e = intercept[AnalysisException] {
+        sql("SELECT LAG(CustomerID) OVER " +
+          "(ORDER BY Quantity ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM df")
+      }
+      assert(e.errorClass === Some("WINDOW_ERROR"))
+      assert(e.message ===
+        "Window Error: Cannot specify window frame for lag function.")
+    }
+  }
+
+  test("WINDOW_ERROR: window frame did not match required frame.") {
+    withTempView("df") {
+      val df = Seq(
+        (536361, "85123A", 2, 17850),
+        (536362, "85123B", 4, 17850),
+        (536363, "86123A", 6, 17851)
+      ).toDF("InvoiceNo", "StockCode", "Quantity", "CustomerID")
+      df.createTempView("df")
+
+      val e = intercept[AnalysisException] {
+        sql("SELECT RANK(CustomerID) OVER " +
+          "(ORDER BY Quantity ROWS BETWEEN CURRENT ROW AND CURRENT ROW) FROM df")
+      }
+      assert(e.errorClass === Some("WINDOW_ERROR"))
+      assert(e.message ===
+        "Window Error: Window Frame specifiedwindowframe(RowFrame, currentrow$(), currentrow$())" +
+          " must match the required frame " +
+          "specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$()).")
+    }
+  }
+
+  test("WINDOW_ERROR: window frame not ordered.") {
+    withTempView("df") {
+      val df = Seq(
+        (536361, "85123A", 2, 17850),
+        (536362, "85123B", 4, 17850),
+        (536363, "86123A", 6, 17851)
+      ).toDF("InvoiceNo", "StockCode", "Quantity", "CustomerID")
+      df.createTempView("df")
+
+      val e = intercept[AnalysisException] {
+        sql("SELECT RANK(CustomerID) OVER " +
+          "(PARTITION BY Quantity ROWS BETWEEN CURRENT ROW AND CURRENT ROW) FROM df")
+      }
+      assert(e.errorClass === Some("WINDOW_ERROR"))
+      e.message should include("requires window to be ordered, " +
+        "please add ORDER BY clause.")
+    }
+  }
+
+  test("UNSUPPORTED_FEATURE: multiple time/session window expressions not supported.") {
+    withTempView("df") {
+      var df = Seq(
+        (1, "2021-01-01 00:30:30", "2021-01-01 00:45:45", 5),
+        (2, "2021-02-02 00:30:30", "2021-02-02 00:45:45", 10),
+        (3, "2021-03-03 00:30:30", "2021-03-03 00:45:45", 15)
+      ).toDF("id", "timestamp_in", "timestamp_out", "quantity")
+      df = df.withColumn("timestamp_in", to_timestamp($"timestamp_in"))
+      df = df.withColumn("timestamp_out", to_timestamp($"timestamp_out"))
+      df.createTempView("df")
+
+      val e = intercept[AnalysisException] {
+        sql("SELECT SUM(quantity) FROM df GROUP by id, WINDOW(timestamp_in, '5 minutes'), " +
+          "WINDOW(timestamp_out, '10 minutes')")
+      }
+      assert(e.errorClass === Some("UNSUPPORTED_FEATURE"))
+      e.message should include("Multiple time/session window expressions would result in a " +
+        "cartesian product of rows, therefore they are currently not supported.")
+    }
+  }
+
+  test("WINDOW_ERROR: gap duration must be CalendarIntervalType.") {
+    withTempView("df") {
+      var df = Seq(
+        (1, "2021-01-01 00:30:30", "2021-01-01 00:45:45", 5),
+        (2, "2021-02-02 00:30:30", "2021-02-02 00:45:45", 10),
+        (3, "2021-03-03 00:30:30", "2021-03-03 00:45:45", 15)
+      ).toDF("id", "timestamp_in", "timestamp_out", "quantity")
+      df = df.withColumn("timestamp_in", to_timestamp($"timestamp_in"))
+      df = df.withColumn("timestamp_out", to_timestamp($"timestamp_out"))
+      df.createTempView("df")
+
+      val e = intercept[AnalysisException] {
+        df.groupBy(session_window($"timestamp_in", $"id")).agg(sum("quantity"))
+      }
+      assert(e.errorClass === Some("WINDOW_ERROR"))
+      assert(e.message === "Window Error: Gap duration expression used in session window " +
+        "must be CalendarIntervalType, but got IntegerType")
+    }
   }
 }
